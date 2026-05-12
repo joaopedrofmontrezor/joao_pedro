@@ -203,6 +203,72 @@ module.exports = class PetController{
         await Pet.findByIdAndUpdate(id, updatedData, { new: true})
         res.status(200).json({ message: "Pet atualizado com sucesso.", data: updatedData})
     }
+
+    static async schedule(req, res){
+        const id = req.params.id
+
+        if(!mongoose.Types.ObjectId.isValid(id)){
+            return res.status(422).json({ message: "O id do pet é inválido."})
+        }
+
+        const pet = await Pet.findById(id)
+
+        if(!pet){
+            return res.status(404).json({ message: "Pet não encontrado"})
+        }
+
+        const token = getToken(req)
+        const user = await getUserByToken(token)
+
+        if(pet.user._id.toString() === user._id.toString()){
+            return res.status(403).json({ message: "Acesso negado, você não pode agendar uma visita para o seu próprio pet."})
+        }
+
+        pet.adopter = {
+            _id: user._id,
+            name: user.name,
+            image: user.image
+        }
+
+        try {
+            await Pet.findByIdAndUpdate(id, pet)
+            return res.status(200).json({
+                message: "A visita foi agendada com sucesso."
+            })
+        } catch (error){
+            return res.status(503).json({ message: error})
+        }
+    }
+
+    static async concludeAdoption(req, res){
+        const id = req.params.id
+
+        if(!mongoose.Types.ObjectId.isValid(id)){
+            return res.status(422).json({ message: "O id do pet é inválido."})
+        }
+
+        const pet = await Pet.findById(id)
+
+        if(!pet){
+            return res.status(404).json({ message: "Pet não encontrado."})
+        }
+
+        const token = getToken(req)
+        const user = await getUserByToken(token)
+
+        if(pet.user._id.toString() !== user._id.toString()){
+            return res.status(403).json({ message: "Acesso negado."})
+        }
+
+        pet.available = false
+
+        try{
+            await Pet.findByIdAndUpdate(id, pet)
+            return res.status(200).json({ message: "Pet adotado com sucesso!"})
+        } catch (error){
+            return res.status(503).json({ message: error})
+        }
+    }
 }
 
 
